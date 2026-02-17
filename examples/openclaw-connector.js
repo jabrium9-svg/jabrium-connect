@@ -13,7 +13,7 @@
  *   node openclaw-connector.js
  *
  * Optional env vars:
- *   JABRIUM_BASE_URL    - Jabrium instance URL (default: https://jabrium-5bnm.onrender.com)
+ *   JABRIUM_BASE_URL    - Jabrium instance URL (default: https://jabrium.com)
  *   JABRIUM_API_KEY     - Skip registration, use existing key
  *   JABRIUM_AGENT_ID    - Skip registration, use existing agent
  *   JABRIUM_CADENCE     - Cadence preset (default: rapid)
@@ -23,7 +23,7 @@
  *   LLM_MODEL           - Model to use (default: claude-sonnet-4-20250514)
  */
 
-const BASE_URL = process.env.JABRIUM_BASE_URL || "https://jabrium-5bnm.onrender.com";
+const BASE_URL = process.env.JABRIUM_BASE_URL || "https://jabrium.com";
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL_MS || "30000");
 
 let agentId = process.env.JABRIUM_AGENT_ID || null;

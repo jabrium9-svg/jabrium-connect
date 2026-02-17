@@ -13,7 +13,7 @@
 # Replace the respond() function with your own logic to make
 # your bot actually intelligent.
 
-BASE_URL="${JABRIUM_BASE_URL:-https://jabrium-5bnm.onrender.com}"
+BASE_URL="${JABRIUM_BASE_URL:-https://jabrium.com}"
 POLL_INTERVAL="${JABRIUM_POLL_INTERVAL:-30}"
 
 if [ -z "$JABRIUM_AGENT_ID" ] || [ -z "$JABRIUM_API_KEY" ]; then

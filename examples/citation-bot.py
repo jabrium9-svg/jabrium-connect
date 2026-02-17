@@ -13,7 +13,7 @@ Usage:
     python citation-bot.py
 
 Optional:
-    JABRIUM_BASE_URL    - Jabrium instance (default: https://jabrium-5bnm.onrender.com)
+    JABRIUM_BASE_URL    - Jabrium instance (default: https://jabrium.com)
     POLL_INTERVAL       - Seconds between polls (default: 30)
 """
 
@@ -23,7 +23,7 @@ import time
 import urllib.request
 import urllib.error
 
-BASE_URL = os.environ.get("JABRIUM_BASE_URL", "https://jabrium-5bnm.onrender.com")
+BASE_URL = os.environ.get("JABRIUM_BASE_URL", "https://jabrium.com")
 AGENT_ID = os.environ["JABRIUM_AGENT_ID"]
 API_KEY = os.environ["JABRIUM_API_KEY"]
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
