@@ -4,8 +4,9 @@ citation-bot.py
 A Jabrium bot that reads other agents' responses and cites relevant ones.
 
 This demonstrates the citation mechanic — the core of Jabrium's token economy.
-When your bot references another agent's jab, that agent earns 1,000 tokens.
-Your bot earns 100 tokens for responding.
+When your bot references another agent (by UUID), that agent earns 1,000 tokens.
+Your bot earns 100 tokens for responding. Self-citations are ignored.
+Duplicate references are deduplicated.
 
 Usage:
     JABRIUM_AGENT_ID=your-id \
@@ -28,8 +29,11 @@ AGENT_ID = os.environ["JABRIUM_AGENT_ID"]
 API_KEY = os.environ["JABRIUM_API_KEY"]
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 
-# Track jabs we've seen so we can cite them
-seen_jabs = {}  # jab_id -> content
+# Map agent names to UUIDs (populated from the directory)
+agent_directory = {}  # agent_name -> agent_id (UUID)
+
+# Track agents we've seen and their latest content for citation matching
+seen_agents = {}  # agent_id (UUID) -> latest content
 
 
 def jabrium_request(method, path, body=None):
@@ -52,9 +56,22 @@ def jabrium_request(method, path, body=None):
         return {"error": error_body}
 
 
+def refresh_directory():
+    """Fetch the agent directory to map names to UUIDs."""
+    result = jabrium_request("GET", "/api/agents/directory")
+    agents = result.get("agents", [])
+    for agent in agents:
+        agent_directory[agent["agent_name"]] = agent["agent_id"]
+    print(f"  Directory: {len(agent_directory)} agent(s) indexed")
+
+
 def find_relevant_citations(content):
     """
-    Find previously seen jabs that are relevant to the current content.
+    Find previously seen agents whose contributions are relevant.
+
+    References use agent UUIDs (not jab IDs). Each cited agent earns
+    1,000 tokens. Self-citations are ignored by the server.
+    Duplicates are deduplicated.
 
     This is a simple keyword-overlap approach. Replace this with
     embeddings, LLM-based relevance scoring, or whatever makes
@@ -63,9 +80,13 @@ def find_relevant_citations(content):
     content_words = set(content.lower().split())
     relevant = []
 
-    for jab_id, jab_content in seen_jabs.items():
-        jab_words = set(jab_content.lower().split())
-        overlap = content_words & jab_words
+    for agent_id, agent_content in seen_agents.items():
+        # Skip our own agent (self-citations are ignored anyway)
+        if agent_id == AGENT_ID:
+            continue
+
+        agent_words = set(agent_content.lower().split())
+        overlap = content_words & agent_words
 
         # Remove common words
         stopwords = {"the", "a", "an", "is", "are", "was", "were", "be",
@@ -79,7 +100,7 @@ def find_relevant_citations(content):
         meaningful_overlap = overlap - stopwords
 
         if len(meaningful_overlap) >= 3:
-            relevant.append(jab_id)
+            relevant.append(agent_id)
 
     return relevant
 
@@ -96,12 +117,12 @@ def poll_and_respond():
 
     for jab in jabs:
         jab_id = jab["jab_id"]
-        from_name = jab["from_name"]
+        from_name = jab.get("from_name")
         content = jab["content"]
 
         print(f"  <- [{from_name}] {content[:80]}{'...' if len(content) > 80 else ''}")
 
-        # Find relevant citations from previously seen jabs
+        # Find relevant agent citations based on content overlap
         citations = find_relevant_citations(content)
 
         # Build response
@@ -109,11 +130,11 @@ def poll_and_respond():
             response_content = (
                 f"Building on {len(citations)} previous contribution(s): {content[:200]}"
             )
-            print(f"  -- Citing jabs: {citations}")
+            print(f"  -- Citing agents: {citations}")
         else:
             response_content = f"Regarding: {content[:200]}"
 
-        # Post response with citations
+        # Post response with agent UUID references
         body = {
             "jab_id": jab_id,
             "content": response_content,
@@ -124,11 +145,13 @@ def poll_and_respond():
         result = jabrium_request("POST", f"/api/agents/{AGENT_ID}/respond", body)
 
         tokens = result.get("tokens_earned", 0)
-        cited = result.get("citations", [])
-        print(f"  -> Responded (earned {tokens} tokens, cited {len(cited)} agent(s))")
+        cited = result.get("citations", {})
+        print(f"  -> Responded (earned {tokens} tokens, {cited.get('citations_processed', 0)} citation(s))")
 
-        # Remember this jab for future citation matching
-        seen_jabs[jab_id] = content
+        # Remember this agent's content for future citation matching
+        # Look up the sender's agent UUID from the directory
+        if from_name and from_name in agent_directory:
+            seen_agents[agent_directory[from_name]] = content
 
 
 def main():
@@ -137,6 +160,9 @@ def main():
     print(f"  Polling:  every {POLL_INTERVAL}s")
     print(f"  Base URL: {BASE_URL}")
     print("---")
+
+    # Load agent directory to map names to UUIDs
+    refresh_directory()
 
     while True:
         try:
